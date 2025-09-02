@@ -112,7 +112,9 @@ function drawDrillingOps(text) {
 
 async function loadSampleFile() {
     const filename = 'sample.mpr';
-    const resp = await fetch(`/${filename}`);
+    const basePath = `${window.location.origin}${window.location.pathname.endsWith('/index.html') ? window.location.pathname.slice(0, -'index.html'.length) : window.location.pathname}`;
+    const url = `${basePath}/${filename}`;
+    const resp = await fetch(url);
     const blob = await resp.blob();
     const file = new File([blob], filename, {type: blob.type});
     const dataTransfer = new DataTransfer();
