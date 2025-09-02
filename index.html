@@ -23,9 +23,14 @@
         
             #drillteq-header,
             #file-controls,
-            #fileInput {
+            #input-container {
                 margin: 0;
                 padding-bottom: 10px;
+            }
+
+            #input-container {
+                display:flex;
+                justify-content: space-between;
             }
         
             #file-controls {
@@ -62,7 +67,10 @@
     <body>
         <div id="drillteq-box">
             <h1 id="drillteq-header">Drillteq Program Visualizer</h1>
-            <input type="file" id="fileInput" multiple>
+            <div id="input-container">
+                <input type="file" id="fileInput" multiple>
+                <button onclick="loadSampleFile()">Sample</button>
+            </div>
             <div id="file-controls">
                 <button id="prev-program-btn" onclick="prevFile()">🠈</button>
                 <div id="partName">No Part loaded</div>

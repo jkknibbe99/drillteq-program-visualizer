@@ -1,5 +1,5 @@
 let file_index = 0;
-let fileList, next_btn, prev_btn, part_name_elem;
+let fileList, fileInput, next_btn, prev_btn, part_name_elem;
 const reader = new FileReader();
 let part_length, part_width, part_name;
 let drill_ops = [];
@@ -110,6 +110,18 @@ function drawDrillingOps(text) {
 }
 
 
+async function loadSampleFile() {
+    const filename = 'sample.mpr';
+    const resp = await fetch(`/${filename}`);
+    const blob = await resp.blob();
+    const file = new File([blob], filename, {type: blob.type});
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    fileInput.files = dataTransfer.files;
+    fileInput.dispatchEvent(new Event('change'));
+}
+
+
 // Code to execute once a file is read
 reader.onload = function (e) {
     const text = e.target.result;
@@ -163,6 +175,7 @@ reader.onload = function (e) {
 
 // Code to execute once DOM is loaded
 window.onload = function () {
+    fileInput = document.querySelector('#fileInput');
     part_name_elem = document.querySelector('#partName');
     next_btn = document.querySelector('#next-program-btn');
     prev_btn = document.querySelector('#prev-program-btn');
@@ -216,7 +229,7 @@ window.onload = function () {
     })
     
     // When new file(s) selected
-    document.querySelector('#fileInput').addEventListener('change', function () {
+    fileInput.addEventListener('change', function () {
         // Clear the canvas
         paper.project.clear();
         paper.view.matrix = new paper.Matrix(); // Reset view transformations
