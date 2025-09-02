@@ -1,150 +1,74 @@
-<script src="https://cdnjs.cloudflare.com/ajax/libs/paper.js/0.12.18/paper-full.min.js" integrity="sha512-qaPSGmKTwpu5ChwJ6AD3w7ecS3yM7pFC1cS3IfnjPM67dhXoymEomk1wqiZEHUFO4dQO1bhjo8LYImVDSDfR1g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script type="text/javascript">
-    // Only executed our code once the DOM is ready.
-    window.onload = function () {
-        const part_name_elem = document.querySelector('#partName');
-
-        var canvas = document.getElementById('canvas');
-        // Update drawing buffer so graphics aren't squished
-        canvas.width = canvas.clientWidth;
-        canvas.height = canvas.clientHeight;
-        // Set up paperjs on canvas
-        paper.setup(canvas);
-        // dowel clearance (purely visual)
-        const dowel_clrnc = 1;  // mm
-
-
-        document.querySelector('#fileInput').addEventListener('change', function () {
-            // Clear the canvas
-            paper.project.clear();
-            paper.view.matrix = new paper.Matrix(); // Reset view transformations
-            // Get files and read them
-            const fileList = this.files;
-            const reader = new FileReader();
-            let part_length, part_width, part_name;
-            let drill_ops = [];
-
-            reader.onload = function (e) {
-                const text = e.target.result;
-                // Find part size
-                part_length = parseFloat(/l="(\d+\.?\d+)"/g.exec(text)[1]);
-                part_width = parseFloat(/w="(\d+\.?\d+)"/g.exec(text)[1]);
-                // Find part name
-                part_name = /Kommentar\\[\S\s]+KM=[\S\s]+KM=[\S\s]+KM="(.*)"/g.exec(text)[1];
-                part_name_elem.innerHTML = part_name;
-                // Create array of drilling operations
-                const matches = text.matchAll(/Komponente\\([\S\s]+?)KO="/g);
-                for (const match of matches) {
-                    let drill_op = {};
-                    const op_text = match[1];
-                    drill_op.edge = parseInt(/VA="Edge (\d)"/g.exec(op_text)[1]);  // get edge number
-                    drill_op.pos = parseFloat(/VA="Pos (\d+\.?\d+)"/g.exec(op_text)[1]);  // get hole position
-                    drill_op.zpos = parseFloat(/VA="ZPos (\d+\.?\d+)"/g.exec(op_text)[1]);  // get hole z position
-                    drill_op.dia = parseFloat(/VA="Diameter (\d+\.?\d+)"/g.exec(op_text)[1]);  // get hole diameter
-                    drill_op.drill_depth = parseFloat(/VA="depth (\d+\.?\d+)"/g.exec(op_text)[1]);  // get drilling depth
-                    drill_op.dowel = parseInt(/VA="dowel (\d+)"/g.exec(op_text)[1]);  // get dowel
-                    drill_op.dowel_length = parseFloat(/VA="DLength (\d+\.?\d+)"/g.exec(op_text)[1]);  // get dowel length
-                    drill_ops.push(drill_op);  // Add drill_op to drill_ops
-                }
-                // Draw part
-                const part_rec = new paper.Path.Rectangle(0, 0, part_width, part_length);
-                part_rec.fillColor = '#a5ccff';
-                part_rec.strokeColor = 'black';
-                part_rec.strokeWidth = 2;
-                // Draw drilling
-                // Edges -> 1: left, 2: top, 3: right, 4: bottom
-                for (const drill_op of drill_ops) {
-                    let Xorig, Yorig, width, length;
-                    if (drill_op.edge === 1) {
-                        Xorig = 0;
-                        Yorig = drill_op.pos;
-                        width = drill_op.drill_depth;
-                        length = drill_op.dia;
-                    } else if (drill_op.edge === 2) {
-                        Xorig = drill_op.pos;
-                        Yorig = 0;
-                        width = drill_op.dia;
-                        length = drill_op.drill_depth;
-                    } else if (drill_op.edge === 3) {
-                        Xorig = part_width - drill_op.drill_depth;
-                        Yorig = drill_op.pos;
-                        width = drill_op.drill_depth;
-                        length = drill_op.dia;
-                    } else if (drill_op.edge === 4) {
-                        Xorig = drill_op.pos;
-                        Yorig = part_length - drill_op.drill_depth;
-                        width = drill_op.dia;
-                        length = drill_op.drill_depth;
-                    } else {
-                        throw Error(`Unexpected drill_op edge (${drill_op.edge})`)
-                    }
-                    const drill_rec = new paper.Path.Rectangle(Xorig, Yorig, width, length);
-                    drill_rec.strokeColor = 'black';
-                    drill_rec.strokeWidth = 1;
-                    drill_rec.dashArray = [4, 2];
-                    // Draw dowel
-                    if (drill_op.dowel === 1) {
-                        const dowel_rec_xorig = [1, 3].includes(drill_op.edge) ? Xorig - (drill_op.edge === 1 ? (drill_op.dowel_length - drill_op.drill_depth) : 0) : Xorig + dowel_clrnc;
-                        const dowel_rec_yorig = [1, 3].includes(drill_op.edge) ? Yorig + dowel_clrnc : Yorig - (drill_op.edge === 2 ? (drill_op.dowel_length - drill_op.drill_depth) : 0);
-                        const dowel_rec_width = [1, 3].includes(drill_op.edge) ? drill_op.dowel_length : width - dowel_clrnc * 2;
-                        const dowel_rec_length = [1, 3].includes(drill_op.edge) ? length - dowel_clrnc * 2 : drill_op.dowel_length;
-                        const dowel_rec = new paper.Path.Rectangle(dowel_rec_xorig, dowel_rec_yorig, dowel_rec_width, dowel_rec_length);
-                        dowel_rec.strokeColor = 'black';
-                        dowel_rec.fillColor = '#b3ffc8ff';
-                        dowel_rec.strokeWidth = 1;
-                    }
-                }
-                paper.view.draw();
-                // Center content
-                let bounds = paper.project.activeLayer.bounds;
-                const offsetX = canvas.offsetWidth / 2 - (bounds.width / 2 + bounds.x);
-                const offsetY = canvas.offsetHeight / 2 - (bounds.height / 2 + bounds.y);
-                paper.view.translate(offsetX, offsetY);
-
-                // Scale if content exceeds canvas size
-                const padding = 20;
-                let new_zoom = 1;
-                if (bounds.height > canvas.offsetHeight) {
-                    new_zoom = canvas.offsetHeight / (bounds.height + padding * 2);
-                }
-                if (bounds.width > canvas.offsetWidth) {
-                    new_zoom = Math.min(new_zoom, canvas.offsetWidth / (bounds.width + padding * 2));
-                }
-                paper.view.zoom = new_zoom;
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/paper.js/0.12.18/paper-full.min.js" integrity="sha512-qaPSGmKTwpu5ChwJ6AD3w7ecS3yM7pFC1cS3IfnjPM67dhXoymEomk1wqiZEHUFO4dQO1bhjo8LYImVDSDfR1g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <script type="text/javascript" src="index.js"></script>
+        <style>
+            html, body {
+                margin: 0;
+                padding: 0;
+                height: 100vh;
+                width: 100vw;
             }
 
-            for (let i = 0; i < fileList.length; i++) {
-                reader.readAsText(fileList[i]);
+            #drillteq-box {
+                height: 100%;
+                background: rgb(208, 208, 208);
+                display: grid;
+                box-sizing: border-box;
+                padding: 20px;
+                grid-template: auto auto auto 1fr / auto;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             }
-        });
-    }
-</script>
-<style>
-    #drillteq-box {
-        height: 100%;
-        background: rgb(208, 208, 208);
-        display: grid;
-        box-sizing: border-box;
-        padding: 20px;
-        grid-template: auto auto auto 1fr / auto;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
+        
+            #drillteq-header,
+            #file-controls,
+            #fileInput {
+                margin: 0;
+                padding-bottom: 10px;
+            }
+        
+            #file-controls {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+            }
 
-    #drilltez-header, #partName, #fileInput {
-        margin: 0;
-        padding-bottom: 10px;
-    }
+            #partName {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                width: 400px;
+                height: 50px;
+                font-weight: bold;
+            }
 
-    #canvas {
-        background: white;
-        border-radius: 10px;
-        width: 100%;
-        height: 100%;
-    }
-</style>
-<div id="drillteq-box">
-    <h1 id="drilltez-header">Drillteq Program Visualizer</h1>
-    <input type="file" id="fileInput" multiple>
-    <h4 id="partName">No Part loaded</h4>
-    <canvas id="canvas"></canvas>
-</div>
+            #prev-program-btn,
+            #next-program-btn {
+                display: none;
+            }
+        
+            #canvas {
+                background: white;
+                border-radius: 10px;
+                width: 100%;
+                height: 100%;
+            }
+        </style>
+    </head>
+    
+    <body>
+        <div id="drillteq-box">
+            <h1 id="drillteq-header">Drillteq Program Visualizer</h1>
+            <input type="file" id="fileInput" multiple>
+            <div id="file-controls">
+                <button id="prev-program-btn" onclick="prevFile()">🠈</button>
+                <div id="partName">No Part loaded</div>
+                <button id="next-program-btn" onclick="nextFile()">🠊</button>
+            </div>
+            <canvas id="canvas"></canvas>
+        </div>
+    </body>
+</html>    
